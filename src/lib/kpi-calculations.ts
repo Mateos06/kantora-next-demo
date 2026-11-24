@@ -1,4 +1,4 @@
-import type { Dataset, Task, Project, Building, Observation } from '@/types/domain';
+import type { Dataset, Task, Project, Building } from '@/types/domain';
 import { SNAPSHOT } from '@/data/projects';
 export const round = (n: number) => Math.round(n * 10) / 10;
 export const money = (n: number) =>

@@ -1,15 +1,14 @@
 'use client';
-import { useState } from 'react';
 import {
   ResponsiveContainer,
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  Legend,
   CartesianGrid,
   ScatterChart,
   Scatter,
@@ -28,7 +27,60 @@ import {
   type Insight,
 } from '@/lib/kpi-calculations';
 import { external } from '@/lib/permissions';
-const colors = ['#253F59', '#F28C28', '#76a7aa'];
+import { Segmented } from '@/components/ui/segmented';
+import { CountUp, Gauge, Sparkline, Stagger } from '@/components/ui/motion';
+
+const COLORS = ['#1d3a57', '#f28c28', '#6f9fa3'];
+const AXIS = { fontSize: 11, fill: '#7a8a9a' };
+const MOTION = { animationDuration: 500, animationEasing: 'ease-out' as const };
+
+type TipEntry = { dataKey?: unknown; name?: unknown; value?: unknown; color?: string };
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+  unit,
+}: {
+  active?: boolean;
+  payload?: readonly TipEntry[];
+  label?: unknown;
+  unit: string;
+}) {
+  if (!active || !payload?.length) return null;
+  const seen = new Set<unknown>();
+  return (
+    <div className="chart-tooltip">
+      <b>{String(label ?? '')}</b>
+      {payload
+        .filter((p) => !seen.has(p.dataKey) && seen.add(p.dataKey))
+        .map((p) => (
+          <span key={String(p.dataKey)}>
+            <i style={{ background: p.color }} />
+            {String(p.name)}
+            <strong>
+              {String(p.value)}
+              {unit}
+            </strong>
+          </span>
+        ))}
+    </div>
+  );
+}
+
+function Legend({ keys }: { keys: string[] }) {
+  return (
+    <div className="chart-legend">
+      {keys.map((k, i) => (
+        <span key={k}>
+          <i style={{ background: COLORS[i % 3] }} />
+          {k}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function Plot({
   title,
   rows,
@@ -46,87 +98,125 @@ export function Plot({
   unit?: string;
   small?: boolean;
 }) {
+  const tooltip = (
+    <Tooltip
+      cursor={line ? { stroke: '#c5cfd8', strokeDasharray: '3 4' } : { fill: '#14283f08' }}
+      content={(props) => <ChartTooltip {...(props as object)} unit={unit} />}
+    />
+  );
+  const axes = [
+    <CartesianGrid key="grid" stroke="#e6ebf0" vertical={false} />,
+    <XAxis key="x" dataKey={x} tick={AXIS} axisLine={false} tickLine={false} dy={6} />,
+    <YAxis key="y" unit={unit} tick={AXIS} axisLine={false} tickLine={false} width={44} />,
+  ];
+  const margin = { top: 8, right: 8, left: -8, bottom: 0 };
   return (
-    <section className="chart-card">
-      <h2>{title}</h2>
+    <Stagger.Item className="chart-card">
+      <div className="chart-head">
+        <h2>{title}</h2>
+        <Legend keys={keys} />
+      </div>
       {!rows.length ? (
         <p>No records for these filters.</p>
       ) : (
-        <div style={{ height: small ? 190 : 265, minWidth: 0 }}>
+        <div style={{ height: small ? 190 : 260, minWidth: 0 }}>
           <ResponsiveContainer width="100%" height="100%">
             {line ? (
-              <LineChart data={rows}>
-                <CartesianGrid strokeDasharray="3 5" vertical={false} />
-                <XAxis dataKey={x} tick={{ fontSize: 10 }} />
-                <YAxis unit={unit} tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend />
+              <ComposedChart data={rows} margin={margin}>
+                {axes}
+                {tooltip}
+                {keys.map((k, i) => (
+                  <Area
+                    key={'area-' + k}
+                    dataKey={k}
+                    type="monotone"
+                    stroke="none"
+                    fill={COLORS[i % 3]}
+                    fillOpacity={0.05}
+                    tooltipType="none"
+                    {...MOTION}
+                  />
+                ))}
                 {keys.map((k, i) => (
                   <Line
                     key={k}
                     dataKey={k}
-                    stroke={colors[i % 3]}
-                    strokeWidth={2.5}
-                    dot={{ r: 3 }}
                     type="monotone"
+                    stroke={COLORS[i % 3]}
+                    strokeWidth={2}
+                    dot={false}
+                    activeDot={{ r: 4, strokeWidth: 2, stroke: '#fff' }}
+                    {...MOTION}
                   />
                 ))}
-              </LineChart>
+              </ComposedChart>
             ) : (
-              <BarChart data={rows}>
-                <CartesianGrid strokeDasharray="3 5" vertical={false} />
-                <XAxis dataKey={x} tick={{ fontSize: 10 }} />
-                <YAxis unit={unit} tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Legend />
+              <BarChart data={rows} margin={margin} barGap={4}>
+                {axes}
+                {tooltip}
                 {keys.map((k, i) => (
-                  <Bar key={k} dataKey={k} fill={colors[i % 3]} radius={[4, 4, 0, 0]} />
+                  <Bar
+                    key={k}
+                    dataKey={k}
+                    fill={COLORS[i % 3]}
+                    radius={[2, 2, 0, 0]}
+                    maxBarSize={38}
+                    {...MOTION}
+                  />
                 ))}
               </BarChart>
             )}
           </ResponsiveContainer>
         </div>
       )}
-    </section>
+    </Stagger.Item>
   );
 }
+
 export function Summary({ data, role, date }: { data: Dataset; role: Role; date: string }) {
   const stats = data.projects.map((p) => projectStats(data, p, date));
   const passed = stats.reduce((n, p) => n + p.passed, 0),
     total = stats.reduce((n, p) => n + p.inspected, 0),
     forecast = stats.reduce((n, p) => n + p.forecast, 0),
     budget = stats.reduce((n, p) => n + p.budget, 0);
+  const done = progress(data, data.buildings, date);
+  const trend = series(data, data.buildings, '2026-05', date.slice(0, 7));
+  const late = stats.reduce((n, p) => n + p.late, 0);
+  const rate = total ? round((100 * passed) / total) : 0;
+  const plan = planned(data, data.buildings, date);
   return (
-    <div className="metrics">
-      <section>
-        <small>VERIFIED COMPLETION</small>
-        <strong data-testid="completion">{progress(data, data.buildings, date)}%</strong>
+    <Stagger className="metrics">
+      <Stagger.Item className="metric lead">
+        <small>Verified completion</small>
+        <CountUp value={done + '%'} testId="completion" />
+        <Gauge value={done} plan={plan} />
         <p>
-          Plan {planned(data, data.buildings, date)}% · {data.buildings.length} authorized buildings
+          Plan {plan}% · {data.buildings.length} authorized buildings
         </p>
-      </section>
-      <section>
-        <small>TIME / SCHEDULE</small>
-        <strong>{stats.reduce((n, p) => n + p.late, 0)} late</strong>
+      </Stagger.Item>
+      <Stagger.Item className={'metric' + (late ? ' warn' : '')}>
+        <small>Time / schedule</small>
+        <CountUp value={late + ' late'} />
         <p>Milestones past their planned date</p>
-      </section>
+      </Stagger.Item>
       {!external(role) && (
         <>
-          <section>
-            <small>FORECAST AT COMPLETION</small>
-            <strong>{compactMoney(forecast)}</strong>
+          <Stagger.Item className="metric">
+            <small>Forecast at completion</small>
+            <CountUp value={compactMoney(forecast)} />
             <p>{compactMoney(forecast - budget)} variance to original budget</p>
-          </section>
-          <section>
-            <small>QUALITY / INSPECTION PASS RATE</small>
-            <strong>{total ? round((100 * passed) / total) + '%' : '—'}</strong>
+            <Sparkline values={trend.map((t) => t.actualSpend)} />
+          </Stagger.Item>
+          <Stagger.Item className={'metric' + (total && rate < 90 ? ' warn' : '')}>
+            <small>Quality / inspection pass rate</small>
+            <CountUp value={total ? rate + '%' : '—'} />
             <p>
               {passed} / {total} completed inspections passed
             </p>
-          </section>
+          </Stagger.Item>
         </>
       )}
-    </div>
+    </Stagger>
   );
 }
 export default function Analytics({
@@ -162,23 +252,18 @@ export default function Analytics({
   const evidence = data.evidence.filter(
     (e) => e.createdAt.slice(0, 10) >= from + '-01' && e.createdAt.slice(0, 10) <= date,
   );
+  const decisions = insights(data, date);
   const name = (id: string) => data.users.find((u) => u.id === id)?.name.split(' ')[0] ?? id;
   return (
     <>
-      <div className="tabs" role="tablist" aria-label="Analytics category">
-        {allowed.map((t) => (
-          <button
-            role="tab"
-            aria-selected={active === t}
-            className={active === t ? 'selected' : 'secondary'}
-            key={t}
-            onClick={() => onTab(t)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-      <div className="chart-grid">
+      <Segmented
+        tabs
+        label="Analytics category"
+        value={active}
+        onChange={onTab}
+        options={allowed}
+      />
+      <Stagger key={active} className="chart-grid">
         {(active === 'Time' || active === 'Progress') && (
           <>
             <Plot
@@ -317,7 +402,7 @@ export default function Analytics({
           </>
         )}
         {active === 'Risk' && (
-          <section className="chart-card">
+          <Stagger.Item className="chart-card wide">
             <h2>Schedule / cost risk matrix</h2>
             <p>
               Bubble size = open defects. X = schedule gap (percentage points); Y = forecast overrun
@@ -326,13 +411,32 @@ export default function Analytics({
             <div style={{ height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ScatterChart>
-                  <CartesianGrid />
-                  <XAxis type="number" dataKey="gap" name="Schedule gap" unit="pp" />
-                  <YAxis type="number" dataKey="overrun" name="Forecast overrun" unit="%" />
+                  <CartesianGrid stroke="#e6ebf0" />
+                  <XAxis
+                    type="number"
+                    dataKey="gap"
+                    name="Schedule gap"
+                    unit="pp"
+                    tick={AXIS}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="overrun"
+                    name="Forecast overrun"
+                    unit="%"
+                    tick={AXIS}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <ZAxis dataKey="defects" range={[80, 500]} />
                   <Tooltip cursor={{ strokeDasharray: '3 3' }} />
                   <Scatter
-                    fill="#F28C28"
+                    fill="#f28c28"
+                    fillOpacity={0.75}
+                    stroke="#c96d14"
+                    {...MOTION}
                     data={stats.map((s) => ({
                       name: s.name,
                       gap: round(s.target - s.actual),
@@ -343,9 +447,9 @@ export default function Analytics({
                 </ScatterChart>
               </ResponsiveContainer>
             </div>
-          </section>
+          </Stagger.Item>
         )}
-      </div>
+      </Stagger>
       {active === 'Time' && (
         <section>
           <h2>Completion outlook</h2>
@@ -405,7 +509,7 @@ export default function Analytics({
               </thead>
               <tbody>
                 {stats
-                  .sort((a, b) => b.variance - a.variance)
+                  .toSorted((a, b) => b.variance - a.variance)
                   .map((s) => (
                     <tr key={s.id}>
                       <td>{s.name}</td>
@@ -439,19 +543,19 @@ export default function Analytics({
         <section>
           <h2>Decisions to make</h2>
           <p>Rule-based diagnostics from the selected records · as of {date}</p>
-          <div className="insights">
-            {insights(data, date).map((i) => (
-              <article key={i.id} className="insight">
+          <Stagger className="insights">
+            {decisions.map((i) => (
+              <Stagger.Item as="article" key={i.id} className="insight">
                 <span className={'badge ' + i.severity}>{i.severity}</span>
                 <h3>{i.title}</h3>
                 <p>{i.evidence}</p>
                 <button className="secondary" onClick={() => onDrill(i)}>
                   {i.action}
                 </button>
-              </article>
+              </Stagger.Item>
             ))}
-            {!insights(data, date).length && <p>No rules triggered for this selection.</p>}
-          </div>
+            {!decisions.length && <p>No rules triggered for this selection.</p>}
+          </Stagger>
         </section>
       )}
     </>

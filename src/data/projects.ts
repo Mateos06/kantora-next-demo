@@ -341,17 +341,15 @@ export function seed(): Dataset {
     }),
   );
   data.users = users;
-  data.activities = data.evidence
-    .slice(-10)
-    .map((e) => ({
-      id: 'activity-' + e.id,
-      projectId: e.projectId,
-      buildingId: e.buildingId,
-      at: e.reviewedAt!,
-      actor: e.reviewerId!,
-      message: 'Approved construction update: ' + e.completion + '%',
-      public: true,
-      readBy: [],
-    }));
+  data.activities = data.evidence.slice(-10).map((e) => ({
+    id: 'activity-' + e.id,
+    projectId: e.projectId,
+    buildingId: e.buildingId,
+    at: e.reviewedAt!,
+    actor: e.reviewerId!,
+    message: 'Approved construction update: ' + e.completion + '%',
+    public: true,
+    readBy: [],
+  }));
   return data;
 }

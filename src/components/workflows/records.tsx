@@ -30,7 +30,7 @@ export function Capture({
   return (
     <>
       <section>
-        <p className="eyebrow">SITE UPDATE / {building.name}</p>
+        <p className="eyebrow">Site update · {building.name}</p>
         <h2>{editing ? 'Revise your report' : 'Capture. Review. Submit.'}</h2>
         <p>
           Stand at the marked point, use the same camera height and keep the building in frame. The
@@ -246,7 +246,9 @@ export function Updates({
                   {e.createdAt.slice(0, 10)} · Floor {e.floor || 'ground'} · {e.point}
                 </p>
               </div>
-              <span className="badge">{e.status}</span>
+              <span className="badge" data-status={e.status}>
+                {e.status}
+              </span>
             </div>
             {!outside && (
               <p>
@@ -437,7 +439,9 @@ export function Tasks({ data, act }: { data: Dataset; act: Act }) {
               Submit completion
             </button>
           ) : (
-            <span className="badge">{t.status}</span>
+            <span className="badge" data-status={t.status}>
+              {t.status}
+            </span>
           )}
         </article>
       ))}
