@@ -1,5 +1,7 @@
 # KANTORA Next.js interactive demo
 
+![Director overview](docs/screenshots/overview.jpg)
+
 Independent frontend-only demonstration. The original `../gener2` platform is not modified or required at runtime.
 
 ## Run
@@ -27,9 +29,24 @@ Open http://localhost:3000/engineer. All eight roles have direct routes; switch 
 7. Engineer → Tasks → submit completion. Manager → Tasks → validate it. Engineer → Quality → record an inspection; the quality indicator responds.
 8. Reset demo data in the footer to start again.
 
+## Screenshots
+
+| Interactive 3D model                 | Customer view                              | Phone                                  |
+| ------------------------------------ | ------------------------------------------ | -------------------------------------- |
+| ![Model](docs/screenshots/model.jpg) | ![Customer](docs/screenshots/customer.jpg) | ![Mobile](docs/screenshots/mobile.jpg) |
+
 ## 3D
 
 Three local architectural GLBs are reused from the original platform. Orbit/zoom, floor highlights, element selection, structure visibility, approved evidence pins, planned/current modes and dated approved overlays are interactive. The floor overlay is illustrative: a reported project percentage does not establish measured floor completion. Evidence pin positions are illustrative. History applies approved report values to the same conceptual model, not an as-built scan.
+
+### Model pipeline
+
+| Command                   | What it does                                                                                                                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run models:optimize` | Upgrades the GLBs in `public/models` (physically based glass and metals, welded geometry, meshopt compression, about 10× smaller). Names are preserved because floor progress relies on them. |
+| `npm run renders`         | With `npm run dev` running, renders the stills in `public/renders`: day and dusk views of each model plus a transparent cutout.                                                               |
+
+The viewer uses image-based lighting, soft shadows, ambient occlusion, SMAA and an adaptive pixel ratio. It switches between day and dusk and shows scaffolding, a crane and site details around buildings under construction.
 
 ## Data and scope
 
@@ -40,11 +57,12 @@ Zustand persists records under `kantora-next-demo-v1` in localStorage. Local pho
 ## Verification
 
 ```powershell
-npm run build
 npm run lint
-npx playwright install chromium
+npm run typecheck
+npm run build
 # Keep the production server running on port 3000 in another terminal
-npx playwright test
+npm test
+# or against another server: $env:BASE_URL = "http://localhost:3070"; npm test
 ```
 
 See `docs/MIGRATION.md` for exact feature scope and `docs/ACCEPTANCE.md` for executed results. Browser tests save desktop/mobile screenshots in `docs/` and an HTML report in `playwright-report/`.
